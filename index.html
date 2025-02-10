@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      background-color: black;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+      position: relative;
+    }
+
+    /* Main ASCII art container is centered */
+    #ascii-container {
+      color: #0f0;
+      white-space: pre;
+      font-size: 8px;
+      position: relative;
+      filter: drop-shadow(0 0 3px rgb(23, 62, 0));
+      z-index: 2;
+    }
+
+    /* This element will hold the header ASCII text and is positioned above the ASCII art */
+    #echosec-text {
+      position: absolute;
+      top: 70%;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #0f0;
+      font-size: 12px;
+      text-align: center;
+      white-space: pre;  /* preserve spacing and line breaks */
+      opacity: 0;        /* initially hidden; will fade in when typing starts */
+      filter: drop-shadow(0 0 5px #0f0);
+      z-index: 2;
+    }
+
+    /* (Optional) A simple glitch effect class */
+    .glitch {
+      animation: glitch 0.1s infinite;
+    }
+    
+    @keyframes glitch {
+      0%   { transform: translate(0); }
+      20%  { transform: translate(-1px, 1px); }
+      40%  { transform: translate(1px, -1px); }
+      60%  { transform: translate(-1px, 0); }
+      80%  { transform: translate(1px, 0); }
+      100% { transform: translate(0); }
+    }
+    
+    /* (Optional) Keyframes for a layer glitch effect used below */
+    @keyframes glitch-layer {
+      0%   { transform: translate(0, 0); }
+      20%  { transform: translate(-2px, 2px); }
+      40%  { transform: translate(2px, -2px); }
+      60%  { transform: translate(-2px, 2px); }
+      80%  { transform: translate(2px, -2px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    .matrix-overlay {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(0deg, 
+                  rgba(0, 255, 0, 0.1) 1px, 
+                  transparent 1px);
+      background-size: 100% 5px;
+      animation: matrix 20s linear infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    @keyframes matrix {
+      from { background-position: 0 100%; }
+      to   { background-position: 0 0; }
+    }
+    
+    .scan-line {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom,
+                  transparent 50%,
+                  rgba(0, 255, 0, 0.05) 51%);
+      background-size: 100% 4px;
+      animation: scan 6s linear infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    @keyframes scan {
+      from { transform: translateY(-100%); }
+      to   { transform: translateY(100%); }
+    }
+  </style>
+</head>
+<body>
+  <div class="matrix-overlay"></div>
+  <div class="scan-line"></div>
+  <!-- The header text will be typed into this element -->
+  <div id="echosec-text"></div>
+  <!-- Main ascii art container -->
+  <div id="ascii-container"></div>
+  <audio id="audio" src="ECHOCEC.m4a"></audio>
+
+  <script>
+    // ASCII art lines (the main "image")
+    const asciiArt = [
+      '                           ..................        ..................                             ',
+      '                          ..............................................                            ',
+      '                         ................................................                           ',
+      '                         ................................................                           ',
+      '                        ..................................................                          ',
+      '                        ..................................................                          ',
+      '                        ...................................................                         ',
+      '                       ....................................................                         ',
+      '                       ....................................................                         ',
+      '                      ......................................................                        ',
+      '                      ......................................................                        ',
+      '                      ......................................................                        ',
+      '                          ..............................................                            ',
+      '                                    ..........................                                      ',
+      '                  ..                                                          .                     ',
+      '          ...............                                                ...............            ',
+      '     ................................                       .................................       ',
+      '   ............................................................................................     ',
+      '  ..............................................................................................    ',
+      '   ............................................................................................     ',
+      '     ........................................................................................       ',
+      '         ................................................................................           ',
+      '                ..................................................................                  ',
+      '                             .......................................                                ',
+      '                                                                                                    ',
+      '                                                                                                    ',
+      '                                                                                                    ',
+      '                                                                                                    ',
+      '                                               ....                                                 ',
+      '                                              ......                                                ',
+      '                                             ........                                               ',
+      '                       ......              ...........              .......                         ',
+      '                        ..................................................                          ',
+      '                        ..................................................                          ',
+      '                         ................................................                           ',
+      '                          ..............................................                            ',
+      '                          ..............................................                            ',
+      '                           ............................................                             ',
+      '                           ............................................                             ',
+      '                              ......................................                                ',
+      '                                  ..............................                                    ',
+      '                                        ...................                                         ',
+      '                                            ..........                                              ',
+      '                                                                                                    ',
+      '                                                                                                    ',
+      '                                                                                                    '
+    ];
+
+    // Header ASCII text to be typed above the main ASCII art.
+    const echosecASCII = [
+        ` #######                       #####                `,
+        ` #        ####  #    #  ####  #     # ######  ####  `,
+        ` #       #    # #    # #    # #       #      #    # `,
+        ` #####   #      ###### #    #  #####  #####  #      `,
+        ` #       #      #    # #    #       # #      #      `,
+        ` #       #    # #    # #    # #     # #      #    # `,
+        ` #######  ####  #    #  ####   #####  ######  ####  `
+    ];
+
+    const container = document.getElementById('ascii-container');
+    const echosecText = document.getElementById('echosec-text');
+    const audio = document.getElementById('audio');
+    let currentLine = 0;
+
+    // Build the main ASCII art line by line.
+    function buildAscii() {
+      if (currentLine < asciiArt.length) {
+        container.textContent = asciiArt.slice(0, currentLine + 1).join('\n');
+        currentLine++;
+        setTimeout(buildAscii, 50);
+      } else {
+        // When drawing is complete, start the glitch, play the audio,
+        // and trigger the header's typed animation.
+        startGlitch();
+        audio.play();
+        startTypedAnimation();
+      }
+    }
+
+    // Simple glitch effect on the main ASCII art container.
+    function startGlitch() {
+      // Create glitch layers (using a clip-path to show half the text).
+      const createGlitchLayer = (color) => {
+        const layer = container.cloneNode();
+        layer.style.position = 'absolute';
+        layer.style.color = color;
+        layer.style.clipPath = 'inset(0 50% 0 0)';
+        layer.style.animation = 'glitch-layer 2s infinite';
+        return layer;
+      };
+
+      container.parentNode.appendChild(createGlitchLayer('#0ff'));
+      container.parentNode.appendChild(createGlitchLayer('#f0f'));
+
+      // Randomly replace characters for an additional glitch effect.
+      setInterval(() => {
+        const chars = ['░', '▒', '▓', '█', '▄', '▀'];
+        const newArt = asciiArt.map(line =>
+          line.split('').map(c =>
+            Math.random() > 0.999 ? chars[Math.floor(Math.random() * chars.length)] : c
+          ).join('')
+        );
+        container.textContent = newArt.join('\n');
+      }, 160);
+    }
+
+    // Typewriter effect: type out each line from echosecASCII into the header.
+    function startTypedAnimation() {
+      // Fade in the header text element.
+      echosecText.style.opacity = 1;
+      echosecText.textContent = ''; // clear any existing text
+
+      let currentLineIndex = 0;
+      function typeLine() {
+        if (currentLineIndex < echosecASCII.length) {
+          let line = echosecASCII[currentLineIndex];
+          let currentChar = 0;
+          function typeChar() {
+            if (currentChar < line.length) {
+              echosecText.textContent += line[currentChar];
+              currentChar++;
+              setTimeout(typeChar, 1); // adjust speed per character
+            } else {
+              // Add a line break after finishing the line and proceed to the next line.
+              echosecText.textContent += "\n";
+              currentLineIndex++;
+              setTimeout(typeLine, 3); // delay between lines
+            }
+          }
+          typeChar();
+        }
+      }
+      typeLine();
+    }
+
+    // Start building the ASCII art (which will trigger the rest once finished).
+    buildAscii();
+
+    function addTextGlitch() {
+      setInterval(() => {
+        if (Math.random() > 0.8) {
+          echosecText.style.transform = `translate(${Math.random() * 4 - 2}px, ${Math.random() * 4 - 2}px)`;
+          echosecText.style.color = `hsl(${Math.random() * 120}, 100%, 50%)`;
+        } else {
+          echosecText.style.transform = 'translate(0)';
+          echosecText.style.color = '#0f0';
+        }
+      }, 100);
+    }
+    // Uncomment to enable glitching on the header text:
+    // addTextGlitch();
+  </script>
+</body>
+</html>
